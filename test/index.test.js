@@ -1,5 +1,7 @@
 const createProbot = require('..')
 const request = require('supertest')
+const nock = require('nock')
+const helper = require('./plugins/helper')
 
 describe('Probot', () => {
   let probot
@@ -168,20 +170,35 @@ describe('Probot', () => {
     })
   })
 
-  describe('sentry', () => {
-    afterEach(() => {
-      // Clean up env variables
-      delete process.env.SENTRY_URL
-      delete process.env.SENTRY_DSN
+  describe('ghe support', function () {
+    let robot
+
+    beforeEach(() => {
+      process.env.GHE_HOST = 'notreallygithub.com'
+
+      nock('https://notreallygithub.com/api/v3')
+       .defaultReplyHeaders({'Content-Type': 'application/json'})
+       .get('/app/installations').reply(200, ['I work!'])
+
+      robot = helper.createRobot()
     })
 
-    describe('SENTRY_DSN', () => {
-      it('configures sentry via the SENTRY_DSN ', () => {
-        process.env.SENTRY_DSN = '1233'
-        expect(() => {
-          createProbot()
-        }).toThrow(/Invalid Sentry DSN: 1233/)
-      })
+    afterEach(() => {
+      delete process.env.GHE_HOST
+    })
+
+    it('requests from the correct API URL', async () => {
+      const spy = jest.fn()
+
+      const plugin = async robot => {
+        const github = await robot.auth()
+        const res = await github.apps.getInstallations({})
+        return spy(res)
+      }
+
+      await plugin(robot)
+      await robot.receive(event)
+      expect(spy.mock.calls[0][0].data[0]).toBe('I work!')
     })
   })
 })

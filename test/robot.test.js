@@ -5,8 +5,22 @@ const logger = require('../lib/logger')
 describe('Robot', function () {
   let robot
   let event
+  let output
+
+  beforeAll(() => {
+    // Add a new stream for testing the logger
+    // https://github.com/trentm/node-bunyan#adding-a-stream
+    logger.addStream({
+      level: 'trace',
+      type: 'raw',
+      stream: {write: log => output.push(log)}
+    })
+  })
 
   beforeEach(function () {
+    // Clear log output
+    output = []
+
     robot = createRobot()
     robot.auth = () => {}
     event = {
@@ -40,25 +54,13 @@ describe('Robot', function () {
 
   describe('on', function () {
     it('adds a logger on the context', async () => {
-      // Add a new stream for testing the logginer
-      // https://github.com/trentm/node-bunyan#adding-a-stream
-      const output = []
-      logger.addStream({
-        level: 'trace',
-        type: 'raw',
-        stream: {write: log => output.push(log)}
-      })
-
       const handler = jest.fn().mockImplementation(context => {
         expect(context.log).toBeDefined()
         context.log('testing')
 
         expect(output[0]).toEqual(expect.objectContaining({
           msg: 'testing',
-          event: expect.objectContaining({
-            id: context.id,
-            installation: event.payload.installation.id
-          })
+          id: context.id
         }))
       })
 
